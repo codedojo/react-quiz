@@ -1,61 +1,44 @@
 import React from 'react';
 
-import {
-    Button,
-    Card, CardHeader, CardActions, CardAction,
-    LinearProgress,
-} from '@codedojo/mdc-react';
+import Question from './Question';
 
-import QuizQuestion from '../QuizQuestion';
+export default function Quiz({ quiz, onAnswer, onEnd }) {
+    const [answer, setAnswer] = React.useState();
 
-export default class Quiz extends React.Component {
-    state = {
-        answer: undefined
+    const handleAnswer = answer => setAnswer(answer);
+
+    const handleNextButtonClick = () => {
+        onAnswer(answer);
+        setAnswer(undefined);
     };
 
-    handleAnswer = index => this.setState({ answer: index });
-
-    handleNextButtonClick = () => {
-        this.setState({ answer: undefined });
-        this.props.onAnswer(this.state.answer);
+    const handleEndButtonClick = () => {
+        onEnd();
+        setAnswer(undefined);
     };
+    
+    return (
+        <main id="quiz">
+            <header>
+                <div>{quiz.title}</div>
+                <div>{quiz.hasNextQuestion && `Вопрос ${quiz.currentQuestionIndex + 1} из ${quiz.numberOfQuestions}`}</div>
+            </header>
 
-    handleCompleteButtonClick = () => {
-        this.setState({ answer: undefined });
-        this.props.onComplete();
-    };
-
-    render() {
-        const { question, questionPosition, numberOfQuestions, hasNextQuestion, progress } = this.props;
-        const { answer } = this.state;
-
-        return (
-            <Card>
-                <CardHeader
-                    title="Тест на знание JavaScript"
-                    subtitle={hasNextQuestion && `Вопрос ${questionPosition} из ${numberOfQuestions}`}
+            {quiz.currentQuestion &&
+                <Question
+                    question={quiz.currentQuestion}
+                    answer={answer}
+                    onAnswer={handleAnswer}
                 />
+            }
 
-                <LinearProgress value={progress} />
-
-                {question &&
-                    <QuizQuestion
-                        question={question}
-                        answer={answer}
-                        onAnswer={this.handleAnswer}
-                    />
+            <footer>
+                {quiz.hasNextQuestion ?
+                    <button onClick={handleNextButtonClick}>Далее</button>
+                    :
+                    <button onClick={handleEndButtonClick}>Завершить</button>
                 }
-
-                <CardActions>
-                    <CardAction>
-                        {hasNextQuestion ?
-                            <Button onClick={this.handleNextButtonClick}>Далее</Button>
-                            :
-                            <Button onClick={this.handleCompleteButtonClick}>Завершить</Button>
-                        }
-                    </CardAction>
-                </CardActions>
-            </Card>
-        );
-    }
+            </footer>
+        </main>
+    );
 }

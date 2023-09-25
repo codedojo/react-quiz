@@ -1,78 +1,131 @@
 import React from 'react';
-import { bindActionCreators } from 'redux';
-import { connect } from 'react-redux';
 
-import {
-    Layout,
-    Spinner,
-} from '@codedojo/mdc-react';
-
-import * as actions from '../store/actions';
+import Home from './Home';
 import Quiz from './Quiz';
-import QuizResults from './QuizResults';
+import Results from './Results';
 
-class App extends React.Component {
-    componentDidMount() {
-        this.props.actions.getQuestions();
-    }
+export default function App({ quizId, getQuiz, getResults }) {
+    const [state, dispatch] = React.useReducer(reducer, initialState);
+    const quiz = selector(state);
 
-    handleAnswer = answer => {
-        this.props.actions.commitAnswer(answer);
+    React.useEffect(() => {
+        dispatch({ type: 'GET_QUIZ' });
+
+        getQuiz()
+            .then(quiz => dispatch({ type: 'SET_QUIZ', quiz }));
+    }, [getQuiz]);
+
+    const handleStart = () =>
+        dispatch({ type: 'START_QUIZ' });
+
+    const handleAnswer = answer =>
+        dispatch({ type: 'SET_ANSWER', answer });
+
+    const handleEnd = () => {
+        dispatch({ type: 'GET_RESULTS' });
+
+        getResults(quizId, state.answers)
+            .then(results => dispatch({ type: 'SET_RESULTS', results }));
     };
 
-    handleComplete = () => {
-        this.props.actions.endQuiz();
-        this.props.actions.getResults(this.props.answers);
-    };
+    if (state.loading) return 'Загрузка...';
 
-    render() {
-        const { loading, question, questionPosition, numberOfQuestions, hasNextQuestion, quizProgress, results, actions } = this.props;
+    if (!state.started) return (
+        <Home
+            quiz={quiz}
+            onStart={handleStart}
+        />
+    );
 
-        if (loading) return <Spinner />;
+    if (state.ended && state.results) return (
+        <Results
+            quiz={quiz}
+            results={state.results}
+        />
+    );
 
-        return (
-            <Layout element="main">
-                {results ?
-                    <QuizResults
-                        results={results}
-                    />
-                    :
-                    <Quiz
-                        question={question}
-                        questionPosition={questionPosition}
-                        numberOfQuestions={numberOfQuestions}
-                        hasNextQuestion={hasNextQuestion}
-                        progress={quizProgress}
-                        onAnswer={this.handleAnswer}
-                        onComplete={this.handleComplete}
-                    />
-                }
-            </Layout>
-        );
-    }
+    if (state.started && quiz) return (
+        <Quiz
+            quiz={quiz}
+            onAnswer={handleAnswer}
+            onEnd={handleEnd}
+        />
+    );
 }
 
-export default connect(
-    state => {
-        const numberOfQuestions = state.questions.length;
-        const question = state.questions[state.currentQuestionIndex];
-        const questionPosition = state.currentQuestionIndex + 1;
-        const hasNextQuestion = state.currentQuestionIndex < state.questions.length;
-        const quizProgress = state.currentQuestionIndex / numberOfQuestions * 100;
+const initialState = {
+    loading: true,
+    started: false,
+    ended: false,
+    quiz: null,
+    currentQuestionIndex: 0,
+    answers: [],
+    results: null
+};
 
-        return {
-            answers: state.answers,
-            loading: state.loading,
-            results: state.results,
-            question,
-            questionPosition,
-            numberOfQuestions,
-            hasNextQuestion,
-            quizProgress
-        };
-    },
+function selector({ quiz, currentQuestionIndex }) {
+    if (!quiz) return null;
 
-    dispatch => ({
-        actions: bindActionCreators(actions, dispatch)
-    })
-)(App);
+    const numberOfQuestions = quiz.questions.length;
+
+    return {
+        ...quiz,
+        numberOfQuestions,
+        currentQuestionIndex,
+        progress: currentQuestionIndex / numberOfQuestions * 100,
+        currentQuestion: quiz.questions[currentQuestionIndex],
+        hasNextQuestion: currentQuestionIndex < numberOfQuestions
+    };
+}
+
+function reducer(state, action) {
+    switch (action.type) {
+        case 'GET_QUIZ':
+            return {
+                ...state,
+                loading: true
+            };
+
+        case 'SET_QUIZ':
+            return {
+                ...state,
+                quiz: action.quiz,
+                loading: false
+            };
+
+        case 'START_QUIZ':
+            return {
+                ...state,
+                started: true
+            };
+
+        case 'SET_ANSWER':
+            return {
+                ...state,
+                answers: [...state.answers, action.answer],
+                currentQuestionIndex: state.currentQuestionIndex + 1
+            };
+
+        case 'END_QUIZ':
+            return {
+                ...state,
+                ended: true
+            };
+
+        case 'GET_RESULTS':
+            return {
+                ...state,
+                loading: true
+            };
+
+        case 'SET_RESULTS':
+            return {
+                ...state,
+                results: action.results,
+                loading: false
+            };
+
+        default:
+            return state;
+    }
+}
